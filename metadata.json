@@ -1,0 +1,8 @@
+{
+  "name": "Hexagon AI",
+  "description": "An interactive AI Chat Assistant named Hexagon AI with custom personality modes, conversation history saving, and detailed studio info.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

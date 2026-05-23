@@ -1,0 +1,72 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer hexagons with clean white outlines, soft corners -->
+    
+    <!-- 1. Top Hexagon -->
+    <path
+        android:pathData="M 48,22.8 L 60,22.8 L 66,33.2 L 60,43.6 L 48,43.6 L 42,33.2 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.2"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+        
+    <!-- 2. Bottom Hexagon -->
+    <path
+        android:pathData="M 48,64.4 L 60,64.4 L 66,74.8 L 60,85.2 L 48,85.2 L 42,74.8 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.2"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+        
+    <!-- 3. Top-Right Hexagon -->
+    <path
+        android:pathData="M 66,33.2 L 78,33.2 L 84,43.6 L 78,54 L 66,54 L 60,43.6 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.2"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+        
+    <!-- 4. Top-Left Hexagon -->
+    <path
+        android:pathData="M 30,33.2 L 42,33.2 L 48,43.6 L 42,54 L 30,54 L 24,43.6 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.2"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+        
+    <!-- 5. Bottom-Right Hexagon -->
+    <path
+        android:pathData="M 66,54 L 78,54 L 84,64.4 L 78,74.8 L 66,74.8 L 60,64.4 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.2"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+        
+    <!-- 6. Bottom-Left Hexagon -->
+    <path
+        android:pathData="M 30,54 L 42,54 L 48,64.4 L 42,74.8 L 30,74.8 L 24,64.4 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.2"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+        
+    <!-- 7. Center Hexagon -->
+    <path
+        android:pathData="M 48,43.6 L 60,43.6 L 66,54 L 60,64.4 L 48,64.4 L 42,54 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.2"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+        
+</vector>
