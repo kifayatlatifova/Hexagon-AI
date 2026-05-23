@@ -179,9 +179,13 @@ fun AuthScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
                             colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = DeepNavyText,
+                                unfocusedTextColor = DeepNavyText,
                                 focusedBorderColor = RoyalBlueMain,
                                 unfocusedBorderColor = BorderSoftBlue,
-                                focusedLabelColor = RoyalBlueMain
+                                focusedLabelColor = RoyalBlueMain,
+                                unfocusedLabelColor = Color.Gray,
+                                cursorColor = RoyalBlueMain
                             ),
                             leadingIcon = {
                                 Icon(Icons.Default.Person, contentDescription = null, tint = Color.Gray)
@@ -204,9 +208,13 @@ fun AuthScreen(
                             .testTag("auth_email_field"),
                         shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = DeepNavyText,
+                            unfocusedTextColor = DeepNavyText,
                             focusedBorderColor = RoyalBlueMain,
                             unfocusedBorderColor = BorderSoftBlue,
-                            focusedLabelColor = RoyalBlueMain
+                            focusedLabelColor = RoyalBlueMain,
+                            unfocusedLabelColor = Color.Gray,
+                            cursorColor = RoyalBlueMain
                         ),
                         leadingIcon = {
                             Icon(Icons.Default.Email, contentDescription = null, tint = Color.Gray)
@@ -230,9 +238,13 @@ fun AuthScreen(
                             .testTag("auth_password_field"),
                         shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = DeepNavyText,
+                            unfocusedTextColor = DeepNavyText,
                             focusedBorderColor = RoyalBlueMain,
                             unfocusedBorderColor = BorderSoftBlue,
-                            focusedLabelColor = RoyalBlueMain
+                            focusedLabelColor = RoyalBlueMain,
+                            unfocusedLabelColor = Color.Gray,
+                            cursorColor = RoyalBlueMain
                         ),
                         leadingIcon = {
                             Icon(Icons.Default.Lock, contentDescription = null, tint = Color.Gray)
@@ -463,8 +475,13 @@ fun AuthScreen(
                         label = { Text(translations["label_oauth_name"] ?: "Имя") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = DeepNavyText,
+                            unfocusedTextColor = DeepNavyText,
                             focusedBorderColor = providerColor,
-                            focusedLabelColor = providerColor
+                            unfocusedBorderColor = BorderSoftBlue,
+                            focusedLabelColor = providerColor,
+                            unfocusedLabelColor = Color.Gray,
+                            cursorColor = providerColor
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -477,8 +494,13 @@ fun AuthScreen(
                         label = { Text(translations["label_oauth_email"] ?: "Email") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = DeepNavyText,
+                            unfocusedTextColor = DeepNavyText,
                             focusedBorderColor = providerColor,
-                            focusedLabelColor = providerColor
+                            unfocusedBorderColor = BorderSoftBlue,
+                            focusedLabelColor = providerColor,
+                            unfocusedLabelColor = Color.Gray,
+                            cursorColor = providerColor
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )

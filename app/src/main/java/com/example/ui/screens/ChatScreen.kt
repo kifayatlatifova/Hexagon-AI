@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +45,13 @@ import com.example.data.database.ChatMessage
 import com.example.data.database.ChatSession
 import com.example.ui.models.Personality
 import com.example.ui.theme.*
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import com.example.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
 
@@ -67,6 +80,116 @@ fun ChatScreen(
     var newSessionTitle by remember { mutableStateOf("") }
 
     val activePersonality = Personality.getById(activeSession?.personalityId ?: currentPersonalityId)
+
+    val context = LocalContext.current
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val data = result.data
+                val results = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                val spokenText = results?.firstOrNull() ?: ""
+                if (spokenText.isNotBlank()) {
+                    messageText = spokenText
+                }
+            }
+        }
+    )
+
+    val startSpeechToText = {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            val langLocale = when (currentLanguage) {
+                "ru" -> "ru-RU"
+                "az" -> "az-AZ"
+                else -> "en-US"
+            }
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, langLocale)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, langLocale)
+            putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, langLocale)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, when (currentLanguage) {
+                "ru" -> "Говорите..."
+                "az" -> "Danışın..."
+                else -> "Speak now..."
+            })
+        }
+        try {
+            speechRecognizerLauncher.launch(intent)
+        } catch (e: Exception) {
+            Toast.makeText(
+                context,
+                when (currentLanguage) {
+                    "ru" -> "Голосовой ввод не поддерживается на вашем устройстве"
+                    "az" -> "Səsli daxiletmə cihazınızda dəstəklənmir"
+                    else -> "Voice input is not supported on your device"
+                },
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    val isLiveModeActive by viewModel.isLiveModeActive.collectAsStateWithLifecycle()
+    val isSpeaking by viewModel.isSpeaking.collectAsStateWithLifecycle()
+
+    val liveModeSpeechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val data = result.data
+                val results = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                val spokenText = results?.firstOrNull() ?: ""
+                if (spokenText.isNotBlank()) {
+                    viewModel.sendMessage(spokenText)
+                }
+            }
+        }
+    )
+
+    val startLiveSpeechToText: () -> Unit = {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            val langLocale = when (currentLanguage) {
+                "ru" -> "ru-RU"
+                "az" -> "az-AZ"
+                else -> "en-US"
+            }
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, langLocale)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, langLocale)
+            putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, langLocale)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, when (currentLanguage) {
+                "ru" -> "Говорите..."
+                "az" -> "Danışın..."
+                else -> "Speak now..."
+            })
+        }
+        try {
+            liveModeSpeechLauncher.launch(intent)
+        } catch (e: Exception) {
+            Toast.makeText(
+                context,
+                when (currentLanguage) {
+                    "ru" -> "Голосовой ввод не поддерживается на вашем устройстве"
+                    "az" -> "Səsli daxiletmə cihazınızda dəstəklənmir"
+                    else -> "Voice input is not supported on your device"
+                },
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    LaunchedEffect(isLiveModeActive) {
+        if (isLiveModeActive) {
+            startLiveSpeechToText()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.onTtsFinishedInLiveMode.collect {
+            if (viewModel.isLiveModeActive.value) {
+                startLiveSpeechToText()
+            }
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -344,6 +467,16 @@ fun ChatScreen(
                         }
                     },
                     actions = {
+                        IconButton(
+                            onClick = { viewModel.setLiveMode(true) },
+                            modifier = Modifier.testTag("action_live_mode_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Mic,
+                                contentDescription = "Live Voice Mode",
+                                tint = RoyalBlueMain
+                            )
+                        }
                         IconButton(onClick = { showSettingsDialog = true }) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
@@ -420,7 +553,8 @@ fun ChatScreen(
                             messageText = ""
                         }
                     },
-                    isResponding = isResponding
+                    isResponding = isResponding,
+                    onVoiceClick = startSpeechToText
                 )
             }
         }
@@ -475,6 +609,17 @@ fun ChatScreen(
             onSaveApiKey = { viewModel.setCustomApiKey(it) },
             onSaveLanguage = { viewModel.setAppLanguage(it) },
             onDismiss = { showSettingsDialog = false }
+        )
+    }
+
+    if (isLiveModeActive) {
+        LiveVoiceOverlay(
+            viewModel = viewModel,
+            currentLanguage = currentLanguage,
+            isResponding = isResponding,
+            isSpeaking = isSpeaking,
+            onClose = { viewModel.setLiveMode(false) },
+            onRetryListen = { startLiveSpeechToText() }
         )
     }
 }
@@ -732,7 +877,8 @@ fun InputPanel(
     currentLanguage: String,
     onTextChanged: (String) -> Unit,
     onSend: () -> Unit,
-    isResponding: Boolean
+    isResponding: Boolean,
+    onVoiceClick: () -> Unit
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -778,6 +924,21 @@ fun InputPanel(
                     .weight(1f)
                     .testTag("message_input_field")
             )
+
+            IconButton(
+                onClick = onVoiceClick,
+                modifier = Modifier
+                    .padding(end = 8.dp)
+                    .size(40.dp)
+                    .testTag("voice_input_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Mic,
+                    contentDescription = "Voice Input",
+                    tint = RoyalBlueMain,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
 
             FloatingActionButton(
                 onClick = {
@@ -1095,7 +1256,13 @@ private val TRANSLATIONS = mapOf(
         "delete_session_desc" to "Удалить беседу",
         "rename_session_desc" to "Переименовать",
         "typing_indicator" to "Hexagon печатает...",
-        "close_btn" to "Закрыть"
+        "close_btn" to "Закрыть",
+        "live_mode" to "Live режим",
+        "live_mode_desc" to "Голосовое общение с Hex",
+        "live_mode_talking" to "Гекс говорит...",
+        "live_mode_listening" to "Слушаю вас...",
+        "live_mode_processing" to "Гекс думает...",
+        "live_mode_tap_to_talk" to "Нажмите для записи"
     ),
     "en" to mapOf(
         "app_title" to "Hexagon AI 🤔",
@@ -1129,7 +1296,13 @@ private val TRANSLATIONS = mapOf(
         "delete_session_desc" to "Delete chat",
         "rename_session_desc" to "Rename",
         "typing_indicator" to "Hexagon is typing...",
-        "close_btn" to "Close"
+        "close_btn" to "Close",
+        "live_mode" to "Live Mode",
+        "live_mode_desc" to "Voice conversation with Hex",
+        "live_mode_talking" to "Hex is speaking...",
+        "live_mode_listening" to "Listening...",
+        "live_mode_processing" to "Hex is thinking...",
+        "live_mode_tap_to_talk" to "Tap to Speak"
     ),
     "az" to mapOf(
         "app_title" to "Hexagon AI 🤔",
@@ -1163,11 +1336,317 @@ private val TRANSLATIONS = mapOf(
         "delete_session_desc" to "Söhbəti sil",
         "rename_session_desc" to "Adını dəyiş",
         "typing_indicator" to "Hexagon yazır...",
-        "close_btn" to "Bağla"
+        "close_btn" to "Bağla",
+        "live_mode" to "Canlı rejim",
+        "live_mode_desc" to "Hex ilə səsli danışıq",
+        "live_mode_talking" to "Hex danışır...",
+        "live_mode_listening" to "Sizi dinləyirəm...",
+        "live_mode_processing" to "Hex düşünür...",
+        "live_mode_tap_to_talk" to "Danışmaq üçün toxunun"
     )
 )
 
 private fun translate(key: String, lang: String): String {
     val langMap = TRANSLATIONS[lang] ?: TRANSLATIONS["ru"]!!
     return langMap[key] ?: key
+}
+
+val Icons.Filled.Mic: ImageVector
+    get() {
+        if (_mic != null) {
+            return _mic!!
+        }
+        _mic = ImageVector.Builder(
+            name = "Filled.Mic",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(12f, 14f)
+                curveToRelative(1.66f, 0f, 3f, -1.34f, 3f, -3f)
+                verticalLineTo(5f)
+                curveToRelative(0f, -1.66f, -1.34f, -3f, -3f, -3f)
+                reflectiveCurveTo(9f, 3.34f, 9f, 5f)
+                verticalLineToRelative(6f)
+                curveToRelative(0f, 1.66f, 1.34f, 3f, 3f, 3f)
+                close()
+                moveTo(17.3f, 11f)
+                curveToRelative(0f, 3f, -2.54f, 5.1f, -5.3f, 5.1f)
+                reflectiveCurveTo(6.7f, 14f, 6.7f, 11f)
+                horizontalLineTo(5f)
+                curveToRelative(0f, 3.41f, 2.72f, 6.23f, 6f, 6.72f)
+                verticalLineTo(21f)
+                horizontalLineToRelative(2f)
+                verticalLineToRelative(-3.28f)
+                curveToRelative(3.28f, -0.48f, 6f, -3.3f, 6f, -6.72f)
+                horizontalLineToRelative(-1.7f)
+                close()
+            }
+        }.build()
+        return _mic!!
+    }
+
+private var _mic: ImageVector? = null
+
+@Composable
+fun LiveVoiceOverlay(
+    viewModel: ChatViewModel,
+    currentLanguage: String,
+    isResponding: Boolean,
+    isSpeaking: Boolean,
+    onClose: () -> Unit,
+    onRetryListen: () -> Unit
+) {
+    val messages by viewModel.messages.collectAsStateWithLifecycle()
+    val lastMessage = messages.lastOrNull()
+
+    // Smooth pulsing scales for Radar Rings
+    val infiniteTransition = rememberInfiniteTransition(label = "RadarAnimation")
+    
+    val pulseScale1 by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 2.4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse1"
+    )
+    val pulseAlpha1 by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 0.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "alpha1"
+    )
+
+    val pulseScale2 by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 3.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, delayMillis = 600, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse2"
+    )
+    val pulseAlpha2 by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 0.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, delayMillis = 600, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "alpha2"
+    )
+
+    val centerScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "center"
+    )
+
+    // Main layout
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0F172A), // Slate 900
+                        Color(0xFF1E1B4B), // Indigo 950
+                        Color(0xFF020617)  // Slate 950
+                    )
+                )
+            )
+            .testTag("live_voice_overlay_container"),
+        contentAlignment = Alignment.Center
+    ) {
+        // Top controls
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 28.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = translate("live_mode", currentLanguage),
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = translate("live_mode_desc", currentLanguage),
+                        color = Color.LightGray.copy(alpha = 0.7f),
+                        fontSize = 12.sp
+                    )
+                }
+
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(Color.White.copy(alpha = 0.15f), CircleShape)
+                        .testTag("close_live_mode_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close Live Mode",
+                        tint = Color.White
+                    )
+                }
+            }
+
+            // Center Dynamic Sphere and Animated Waves
+            Box(
+                modifier = Modifier
+                    .size(280.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                // Outer Pulse Ring 2 (Only active when speaking or listening)
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .scale(if (isSpeaking || (!isResponding && !isSpeaking)) pulseScale2 else 1.0f)
+                        .alpha(if (isSpeaking || (!isResponding && !isSpeaking)) pulseAlpha2 else 0.0f)
+                        .background(
+                            color = if (isSpeaking) RoyalBlueMain.copy(alpha = 0.35f) else AccentSkyBlue.copy(alpha = 0.35f),
+                            shape = CircleShape
+                        )
+                )
+
+                // Outer Pulse Ring 1
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .scale(if (isSpeaking || (!isResponding && !isSpeaking)) pulseScale1 else 1.0f)
+                        .alpha(if (isSpeaking || (!isResponding && !isSpeaking)) pulseAlpha1 else 0.0f)
+                        .background(
+                            color = if (isSpeaking) RoyalBlueMain.copy(alpha = 0.45f) else AccentSkyBlue.copy(alpha = 0.45f),
+                            shape = CircleShape
+                        )
+                )
+
+                // Main Central Button
+                val glowColor = if (isResponding) Color(0xFFF59E0B) // Amber for thinking
+                else if (isSpeaking) RoyalBlueMain // Royal Blue for speaking
+                else AccentSkyBlue // Sky Blue for listening
+
+                Box(
+                    modifier = Modifier
+                        .size(110.dp)
+                        .scale(if (isSpeaking || (!isResponding && !isSpeaking)) centerScale else 1.0f)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    glowColor,
+                                    glowColor.copy(alpha = 0.7f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                        .clickable {
+                            if (!isSpeaking && !isResponding) {
+                                onRetryListen()
+                            }
+                        }
+                        .testTag("live_sphere_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Mic,
+                        contentDescription = "Microphone",
+                        tint = Color.White,
+                        modifier = Modifier.size(44.dp)
+                    )
+                }
+            }
+
+            // Bottom Status and last text
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+            ) {
+                // Big Status Text
+                val statusText = if (isResponding) {
+                    translate("live_mode_processing", currentLanguage)
+                } else if (isSpeaking) {
+                    translate("live_mode_talking", currentLanguage)
+                } else {
+                    translate("live_mode_listening", currentLanguage)
+                }
+
+                Text(
+                    text = statusText,
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.testTag("live_status_text")
+                )
+
+                // Subtitle/Helper action
+                if (!isResponding && !isSpeaking) {
+                    Text(
+                        text = "(${translate("live_mode_tap_to_talk", currentLanguage)})",
+                        color = Color.LightGray.copy(alpha = 0.6f),
+                        fontSize = 13.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Transcript Window (Show last chat transcription)
+                if (lastMessage != null) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 60.dp, max = 110.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color.White.copy(alpha = 0.08f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = if (lastMessage.sender == "user") "Вы:" else "Hex:",
+                                fontWeight = FontWeight.Bold,
+                                color = if (lastMessage.sender == "user") AccentSkyBlue else Color(0xFF10B981),
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                            Text(
+                                text = lastMessage.text,
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

@@ -15,6 +15,11 @@ import com.example.data.database.ChatRepository
 import com.example.data.database.ChatSession
 import com.example.data.database.User
 import com.example.ui.models.Personality
+import android.speech.tts.TextToSpeech
+import java.util.Locale
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,12 +74,33 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private var messageCollectionJob: Job? = null
 
+    // TextToSpeech & Live Voice Mode States
+    private var tts: TextToSpeech? = null
+    private val _isTtsInitialized = MutableStateFlow(false)
+
+    private val _isLiveModeActive = MutableStateFlow(false)
+    val isLiveModeActive: StateFlow<Boolean> = _isLiveModeActive.asStateFlow()
+
+    private val _isSpeaking = MutableStateFlow(false)
+    val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
+
+    private val _onTtsFinishedInLiveMode = MutableSharedFlow<Unit>()
+    val onTtsFinishedInLiveMode: SharedFlow<Unit> = _onTtsFinishedInLiveMode.asSharedFlow()
+
     init {
         // Load settings from SharedPreferences
         _preferredPersonality.value = prefs.getString("preferred_personality", "standard") ?: "standard"
         _preferredModel.value = prefs.getString("preferred_model", "gemini-3.5-flash") ?: "gemini-3.5-flash"
         _customApiKey.value = prefs.getString("custom_api_key", "") ?: ""
         _appLanguage.value = prefs.getString("app_language", "ru") ?: "ru"
+
+        // Initialize TTS
+        tts = TextToSpeech(application) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                _isTtsInitialized.value = true
+                setupTtsLanguage()
+            }
+        }
 
         val loggedInUserId = prefs.getLong("logged_in_user_id", -1L)
         if (loggedInUserId != -1L) {
@@ -246,6 +272,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val aiMsg = ChatMessage(sessionId = sessionId, sender = "hex", text = responseText)
                 repository.insertMessage(aiMsg)
 
+                if (_isLiveModeActive.value) {
+                    speak(responseText) {
+                        viewModelScope.launch {
+                            _onTtsFinishedInLiveMode.emit(Unit)
+                        }
+                    }
+                }
+
             } catch (e: Exception) {
                 e.printStackTrace()
                 val errorText = when {
@@ -360,5 +394,71 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun logout() {
         _currentUser.value = null
         prefs.edit().remove("logged_in_user_id").apply()
+    }
+
+    private fun setupTtsLanguage() {
+        val currentLang = _appLanguage.value
+        val locale = when (currentLang) {
+            "ru" -> Locale("ru", "RU")
+            "az" -> Locale("az", "AZ")
+            else -> Locale.US
+        }
+        tts?.language = locale
+    }
+
+    fun speak(text: String, onSpeechFinished: () -> Unit = {}) {
+        if (!_isTtsInitialized.value || tts == null) {
+            onSpeechFinished()
+            return
+        }
+
+        setupTtsLanguage()
+
+        val cleanText = text.replace(Regex("[*#`_\\\\[\\\\]()]"), "")
+        
+        _isSpeaking.value = true
+        
+        tts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                _isSpeaking.value = true
+            }
+
+            override fun onDone(utteranceId: String?) {
+                _isSpeaking.value = false
+                viewModelScope.launch {
+                    onSpeechFinished()
+                }
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) {
+                _isSpeaking.value = false
+                viewModelScope.launch {
+                    onSpeechFinished()
+                }
+            }
+        })
+
+        val params = android.os.Bundle()
+        params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "hex_tts")
+        tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, params, "hex_tts")
+    }
+
+    fun stopSpeaking() {
+        tts?.stop()
+        _isSpeaking.value = false
+    }
+
+    fun setLiveMode(active: Boolean) {
+        _isLiveModeActive.value = active
+        if (!active) {
+            stopSpeaking()
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        tts?.stop()
+        tts?.shutdown()
     }
 }
